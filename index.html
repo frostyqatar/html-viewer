@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HTML Viewer — open an HTML file on any device</title>
+    <meta name="description" content="Open, preview and full-screen any HTML file in your browser. Nothing is uploaded; everything stays on your device." />
+    <meta name="theme-color" content="#f7f4ee" />
+    <style>
+      :root {
+        --paper: #f7f4ee;
+        --ink: #14161a;
+        --muted: #5c6470;
+        --line: #d8d2c6;
+        --accent: #0b57d0;
+        --accent-soft: #e8eefb;
+        --radius: 10px;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        display: flex;
+        flex-direction: column;
+        -webkit-font-smoothing: antialiased;
+      }
+      button { font: inherit; color: inherit; cursor: pointer; }
+      :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+      header.bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .dot { width: 10px; height: 10px; background: var(--accent); display: inline-block; }
+      .bar-meta { font-size: 13px; color: var(--muted); text-align: right; }
+
+      main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+      .empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 40px 20px 60px;
+        max-width: 620px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      .empty h1 {
+        font-size: clamp(28px, 6vw, 40px);
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 0 12px;
+      }
+      .empty p.lead { margin: 0 0 26px; color: var(--muted); max-width: 44ch; }
+
+      .drop {
+        border: 2px dashed var(--line);
+        border-radius: var(--radius);
+        padding: 28px 20px;
+        text-align: center;
+        transition: border-color 0.15s ease, background 0.15s ease;
+        background: #fdfbf7;
+      }
+      .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+      .drop strong { display: block; margin-bottom: 4px; }
+      .drop span { color: var(--muted); font-size: 14px; }
+
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+      .btn {
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: #fff;
+        padding: 12px 18px;
+        border-radius: 8px;
+        font-weight: 600;
+        line-height: 1.2;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .btn:hover { background: #000; border-color: #000; }
+      .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+      .btn-ghost:hover { background: #ece7dd; border-color: var(--line); }
+      .btn-small { padding: 8px 12px; font-size: 14px; border-radius: 7px; }
+      .hint { margin-top: 18px; font-size: 13px; color: var(--muted); }
+
+      .paste { margin-top: 22px; }
+      .paste textarea {
+        width: 100%;
+        min-height: 180px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #fff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        resize: vertical;
+      }
+
+      .pending {
+        margin-top: 22px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+      }
+      .pending .grow { flex: 1 1 200px; min-width: 0; }
+      .pending b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .pending small { color: var(--muted); }
+
+      .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--line);
+        background: #fdfbf7;
+        flex-wrap: wrap;
+      }
+      .fileinfo { min-width: 0; display: flex; align-items: baseline; gap: 10px; font-size: 14px; }
+      .fileinfo strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 46vw;
+      }
+      .fileinfo span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+      .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+
+      iframe {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        background: #fff;
+      }
+
+      body.full header.bar,
+      body.full .toolbar { display: none; }
+      body.full .view { position: fixed; inset: 0; z-index: 10; }
+      body.full iframe { height: 100dvh; }
+
+      @media (max-width: 560px) {
+        header.bar { padding: 12px 16px; }
+        .bar-meta { display: none; }
+        .empty { padding: 28px 16px 48px; }
+        .toolbar { padding: 10px 12px; }
+        .fileinfo strong { max-width: 40vw; }
+        .tools { width: 100%; justify-content: space-between; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand"><span class="dot" aria-hidden="true"></span> HTML Viewer</div>
+      <div class="bar-meta">Local only. Nothing is uploaded.</div>
+    </header>
+
+    <main>
+      <section class="empty" id="empty">
+        <h1>Open an HTML file</h1>
+        <p class="lead">
+          Drop a <strong>.html</strong> file here, or pick one from your phone. It renders in a sandbox and never
+          leaves your device.
+        </p>
+
+        <div class="drop" id="drop">
+          <strong>Drop an HTML file</strong>
+          <span>or use the buttons below</span>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="pick" type="button">Choose a file</button>
+          <button class="btn btn-ghost" id="pasteToggle" type="button">Paste HTML</button>
+        </div>
+
+        <p class="hint">On a phone: download the file first, then choose it from Files or Downloads.</p>
+
+        <div class="paste" id="pasteWrap" hidden>
+          <label class="sr-only" for="pasteArea" style="position: absolute; left: -9999px">HTML source</label>
+          <textarea id="pasteArea" spellcheck="false" placeholder="<!doctype html> …"></textarea>
+          <div class="actions">
+            <button class="btn" id="renderPaste" type="button">Render</button>
+            <button class="btn btn-ghost" id="cancelPaste" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div class="pending" id="pending" hidden>
+          <div class="grow">
+            <b id="pendingName"></b>
+            <small id="pendingMeta"></small>
+          </div>
+          <button class="btn btn-small" id="restore" type="button">Reopen</button>
+          <button class="btn btn-small btn-ghost" id="forget" type="button">Forget</button>
+        </div>
+
+        <input type="file" id="file" accept=".html,.htm,text/html" hidden />
+        <p class="hint" id="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="view" id="view" hidden>
+        <div class="toolbar">
+          <div class="fileinfo">
+            <strong id="fileName">document.html</strong>
+            <span id="fileSize"></span>
+          </div>
+          <div class="tools">
+            <button class="btn btn-small" id="full" type="button">Full screen</button>
+            <button class="btn btn-small" id="tab" type="button">New tab</button>
+            <button class="btn btn-small btn-ghost" id="replace" type="button">Replace</button>
+            <button class="btn btn-small btn-ghost" id="close" type="button">Close</button>
+          </div>
+        </div>
+        <iframe
+          id="frame"
+          title="HTML preview"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-pointer-lock"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        var $ = function (id) { return document.getElementById(id); };
+        var empty = $("empty"), view = $("view"), drop = $("drop"), fileInput = $("file");
+        var frame = $("frame"), fileName = $("fileName"), fileSize = $("fileSize"), status = $("status");
+        var pending = $("pending"), pendingName = $("pendingName"), pendingMeta = $("pendingMeta");
+        var currentHtml = "", currentName = "";
+        var DB = "html-viewer-db", STORE = "docs";
+
+        function fmtBytes(n) {
+          if (n < 1024) return n + " B";
+          if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+          return (n / (1024 * 1024)).toFixed(1) + " MB";
+        }
+
+        function setStatus(msg) { status.textContent = msg || ""; }
+
+        function idb() {
+          return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(DB, 1);
+            req.onupgradeneeded = function () { req.result.createObjectStore(STORE); };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror = function () { reject(req.error); };
+          });
+        }
+
+        function saveDoc(doc) {
+          return idb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+              var tx = db.transaction(STORE, "readwrite");
+              tx.objectStore(STORE).put(doc, "last");
+              tx.oncomplete = resolve;
+              tx.onerror = function () { reject(tx.error); };
+            });
+          });
+        }
+
+        function loadDoc() {
+          return idb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+              var tx = db.transaction(STORE, "readonly");
+              var req = tx.objectStore(STORE).get("last");
+              req.onsuccess = function () { resolve(req.result || null); };
+              req.onerror = function () { reject(req.error); };
+            });
+          });
+        }
+
+        function forgetDoc() {
+          return idb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+              var tx = db.transaction(STORE, "readwrite");
+              tx.objectStore(STORE).delete("last");
+              tx.oncomplete = resolve;
+              tx.onerror = function () { reject(tx.error); };
+            });
+          });
+        }
+
+        function render(name, html) {
+          currentName = name;
+          currentHtml = html;
+          var bytes = new Blob([html]).size;
+          fileName.textContent = name;
+          fileSize.textContent = fmtBytes(bytes);
+          document.title = name + " — HTML Viewer";
+          frame.srcdoc = html;
+          empty.hidden = true;
+          view.hidden = false;
+          setStatus("");
+          if (location.hash !== "#view") history.replaceState(null, "", "#view");
+          saveDoc({ name: name, html: html, at: Date.now() }).catch(function () {});
+          window.scrollTo(0, 0);
+        }
+
+        function reset() {
+          frame.removeAttribute("srcdoc");
+          view.hidden = true;
+          empty.hidden = false;
+          document.title = "HTML Viewer — open an HTML file on any device";
+          document.body.classList.remove("full");
+          if (location.hash) history.replaceState(null, "", location.pathname);
+          checkPending();
+        }
+
+        function readFile(file) {
+          if (!file) return;
+          var ok = /\.html?$/i.test(file.name) || file.type === "text/html";
+          if (!ok) { setStatus("That is not an .html file. Choose a .html or .htm file."); return; }
+          if (file.size > 40 * 1024 * 1024) { setStatus("That file is bigger than 40 MB. Try a smaller build."); return; }
+          setStatus("Reading " + file.name + "…");
+          file.text().then(function (text) {
+            render(file.name, text);
+          }).catch(function () {
+            setStatus("Could not read that file.");
+          });
+        }
+
+        // file picker
+        $("pick").addEventListener("click", function () { fileInput.click(); });
+        fileInput.addEventListener("change", function () {
+          readFile(fileInput.files && fileInput.files[0]);
+          fileInput.value = "";
+        });
+
+        // drag & drop
+        ["dragenter", "dragover"].forEach(function (evt) {
+          document.addEventListener(evt, function (e) {
+            e.preventDefault();
+            drop.classList.add("over");
+          });
+        });
+        ["dragleave", "drop"].forEach(function (evt) {
+          document.addEventListener(evt, function (e) {
+            e.preventDefault();
+            if (evt === "dragleave" && e.target !== document.documentElement) return;
+            drop.classList.remove("over");
+          });
+        });
+        document.addEventListener("drop", function (e) {
+          var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (f) readFile(f);
+        });
+
+        // paste
+        var pasteWrap = $("pasteWrap"), pasteArea = $("pasteArea");
+        $("pasteToggle").addEventListener("click", function () {
+          pasteWrap.hidden = !pasteWrap.hidden;
+          if (!pasteWrap.hidden) pasteArea.focus();
+        });
+        $("cancelPaste").addEventListener("click", function () { pasteWrap.hidden = true; });
+        $("renderPaste").addEventListener("click", function () {
+          var html = pasteArea.value.trim();
+          if (!html) { setStatus("Paste some HTML first."); return; }
+          render("pasted.html", html);
+        });
+
+        // toolbar
+        $("full").addEventListener("click", function () {
+          if (!document.body.classList.contains("full")) {
+            document.body.classList.add("full");
+            if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+              document.documentElement.requestFullscreen().catch(function () {});
+            }
+          } else {
+            document.body.classList.remove("full");
+            if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+          }
+        });
+        document.addEventListener("fullscreenchange", function () {
+          if (!document.fullscreenElement) document.body.classList.remove("full");
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && document.body.classList.contains("full")) {
+            document.body.classList.remove("full");
+            if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+          }
+        });
+
+        $("tab").addEventListener("click", function () {
+          var blob = new Blob([currentHtml], { type: "text/html;charset=utf-8" });
+          var url = URL.createObjectURL(blob);
+          window.open(url, "_blank", "noopener");
+          setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        });
+
+        $("replace").addEventListener("click", function () { fileInput.click(); });
+        $("close").addEventListener("click", reset);
+
+        // restore last document
+        function checkPending() {
+          if (view.hidden === false) return;
+          loadDoc().then(function (doc) {
+            if (!doc || !doc.html) { pending.hidden = true; return; }
+            pendingName.textContent = doc.name || "document.html";
+            pendingMeta.textContent =
+              fmtBytes(new Blob([doc.html]).size) +
+              " · opened " +
+              new Date(doc.at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+            pending.hidden = false;
+          }).catch(function () { pending.hidden = true; });
+        }
+
+        $("restore").addEventListener("click", function () {
+          loadDoc().then(function (doc) {
+            if (doc && doc.html) render(doc.name || "document.html", doc.html);
+          });
+        });
+        $("forget").addEventListener("click", function () {
+          forgetDoc().then(function () { pending.hidden = true; });
+        });
+
+        // test hook + deep link
+        window.__render = render;
+
+        checkPending();
+        if (location.hash === "#view") {
+          loadDoc().then(function (doc) { if (doc && doc.html) render(doc.name || "document.html", doc.html); });
+        }
+      })();
+    </script>
+  </body>
+</html>
